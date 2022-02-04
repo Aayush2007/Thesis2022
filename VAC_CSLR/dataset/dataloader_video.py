@@ -37,7 +37,6 @@ class BaseFeeder(data.Dataset):
         # self.inputs_list = np.load(f"{prefix}/annotations/manual/{mode}.corpus.npy", allow_pickle=True).item()
         # self.inputs_list = np.load(f"{prefix}/annotations/manual/{mode}.corpus.npy", allow_pickle=True).item()
         # self.inputs_list = dict([*filter(lambda x: isinstance(x[0], str) or x[0] < 10, self.inputs_list.items())])
-        print(mode, len(self))
         self.data_aug = self.transform()
         print("")
 

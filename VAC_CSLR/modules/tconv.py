@@ -47,8 +47,6 @@ class TemporalConv(nn.Module):
         return feat_len
 
     def forward(self, frame_feat, lgt):
-        print("tconv.py")
-        print(type(frame_feat))
         visual_feat = self.temporal_conv(frame_feat)
         lgt = self.update_lgt(lgt)
         logits = None if self.num_classes == -1 \

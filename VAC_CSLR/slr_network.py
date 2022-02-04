@@ -48,23 +48,15 @@ class SLRModel(nn.Module):
     def masked_bn(self, inputs, len_x):
         def pad(tensor, length):
             return torch.cat([tensor, tensor.new(length - tensor.size(0), *tensor.size()[1:]).zero_()])
-        temp = []
-        for idx, lgt in enumerate(len_x):
-            a = (len_x[0] * idx).reshape((1,)).int()
-            b = (len_x[0] * idx + lgt).reshape((1,)).int()
-            ntemp = inputs[a.item():b.item()]
-            temp.append(ntemp)
-        x = torch.cat(temp)
-        #x = torch.cat([inputs[len_x[0] * idx:len_x[0] * idx + lgt] for idx, lgt in enumerate(len_x)])
-        x = torch.LongTensor(x)
-        print(type(x))
-        x = self.conv2d(x.long())
+
+        x = torch.cat([inputs[len_x[0] * idx:len_x[0] * idx + lgt] for idx, lgt in enumerate(len_x)])
+        x = self.conv2d(x)
         x = torch.cat([pad(x[sum(len_x[:idx]):sum(len_x[:idx + 1])], len_x[0])
                        for idx, lgt in enumerate(len_x)])
         return x
 
     def forward(self, x, len_x, label=None, label_lgt=None):
-        print("In slr_network.py forward")
+        print("In slr_network.py forward:")
         print(x.shape)
         print(len_x)
         print(type(len_x))
@@ -77,8 +69,6 @@ class SLRModel(nn.Module):
         else:
             # frame-wise features
             framewise = x
-
-        print(framewise)
 
         conv1d_outputs = self.conv1d(framewise, len_x)
         # x: T, B, C

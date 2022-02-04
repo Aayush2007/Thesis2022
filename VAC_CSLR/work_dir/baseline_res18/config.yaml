@@ -7,7 +7,7 @@ dataset_info:
   evaluation_dir: ./evaluation/slr_eval
   evaluation_prefix: phoenix2014-groundtruth
 decode_mode: beam
-device: 0,1,2
+device: None
 eval_interval: 1
 evaluate_tool: sclite
 feeder: dataset.dataloader_video.BaseFeeder
@@ -42,7 +42,7 @@ optimizer_args:
   - 40
   - 60
   weight_decay: 0.0001
-phase: features
+phase: test
 print_log: true
 random_fix: true
 random_seed: 0
