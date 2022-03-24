@@ -41,7 +41,7 @@ class TemporalConv(nn.Module):
         feat_len = copy.deepcopy(lgt)
         for ks in self.kernel_size:
             if ks[0] == 'P':
-                feat_len //= 2
+                feat_len = torch.div(feat_len, 2, rounding_mode='floor') #feat_len //= 2
             else:
                 feat_len -= int(ks[1]) - 1
         return feat_len
