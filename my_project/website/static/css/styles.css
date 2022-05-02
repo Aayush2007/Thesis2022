@@ -1,0 +1,30 @@
+body{
+    color: white;
+    text-align: center;
+}
+h1{
+    padding: 2%;
+}
+.question, .tweet {
+    font-size: 35px;
+    padding: 20px 0;
+}
+.tweet {
+    background-color: blue;
+    padding: 5%;
+    margin: 7%;
+}
+.video-capture img{
+    border: 5px red solid;
+}
+p.container{
+    text-align: justify;
+    font-size: 18px;
+}
+.task-area{
+    margin: 2% 0;
+}
+.pred_response {
+    font-size: 30px;
+    padding-top: 10px;
+}
