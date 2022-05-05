@@ -31,6 +31,7 @@
                     $('#tweet-area').hide();
                     $('#vqa-area').show();
                 }
+                $('#response').text(data.sentence.toString());
               }
               else{
                 $('#stop-area').show();
@@ -48,6 +49,8 @@
 
             $("#stop").click(function(){
                 clearInterval(intervalID);
+                $('#stop-area').hide();
+                $('#done-area').show();
             });
         });
     </script>
@@ -95,7 +98,7 @@
         <div id="start-area" style="margin-top: 5%;">
             <form method="post" action="/home">
                 <div class="container col-md-4 d-grid">
-                    <button class="btn btn-success" type="submit" id="start">START</button>
+                    <button class="btn btn-primary" type="submit" id="start">START</button>
                 </div>
             </form>
         </div>
@@ -105,17 +108,22 @@
                 <button class="btn btn-danger" type="button" id="stop">STOP</button>
             </div>
         </div>
+        <div id="done-area" style="margin-top: 2%; display: none;">
+            <div class="container col-md-4 d-grid">
+                <button class="btn btn-success" id="done">DONE</button>
+            </div>
+        </div>
         <div id="task-area" class="task-area container-fluid">
             <div class="row">
                 <div class="col">
                     <div id="tweet-area">
-                        <div class="tweet bottom-left" id="tweet">{{tweet}}</div>
+                        <div class="tweet bottom-left" id="tweet">{{ tweet }}</div>
                         <div class="question bottom-left">Do you think this statement is Positive,
                             Negative or Neutral?</div>
                     </div>
                     <div id="vqa-area">
-                        <img id="img_path" src="{{img_path}}" width="55%" height="60%" alt="Image to Answer."/>
-                        <div class="question bottom-left" id="question">{{question}}</div>
+                        <img id="img_path" src="{{ img_path }}" width="55%" height="60%" alt="Image to Answer."/>
+                        <div class="question bottom-left" id="question"></div>
                     </div>
                 </div>
                 <!--<div class="col" id="stop-area">
@@ -130,7 +138,7 @@
                         <img src="{{url_for('video')}}" width="75%" alt="Video Capture"/>
                     </div>
                     <div class="pred_response">
-                        Response:
+                        Response: <div id="response"></div>
                     </div>
                 </div>
             </div>

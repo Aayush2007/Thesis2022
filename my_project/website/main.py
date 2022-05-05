@@ -6,12 +6,12 @@ import numpy as np
 from model import actions, mp_holistic, mediapipe_detection, draw_styled_landmarks, extract_keypoints, prepareModel
 from statistics import mode
 import random
-import time
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
-camera = cv2.VideoCapture(cv2.CAP_V4L2)
+camera = None # cv2.VideoCapture(cv2.CAP_V4L2)
 question_ids = []
 
 f = open('v2_mscoco_val2014_annotations_yesno.json', )
@@ -29,14 +29,15 @@ question = ''
 img_path = ''
 ans = ''
 tweet = ''
+tweet_label = -1
 showTweet = False
 num_tasks_shown = 0
 showButton = True
 taskFinish = False
-prolific_id = ''
-session_id = ''
 sub_task_time = 10
-total_num_tasks = 5
+total_num_tasks = 15
+sentence = []
+response_obj = {}
 
 no_sequences = 60  # stores number of videos for each action.
 sequence_length = 50  # stores number of frames per video
@@ -71,32 +72,56 @@ def getItemsToShow():
     global tweet
     global num_tasks_shown
     global taskFinish
+    global tweet_label
+    global sentence
 
     print(num_tasks_shown)
+
+    if num_tasks_shown != 0:
+        res = {
+            'image_name': img_path,
+            'question': question,
+            'tweet': tweet,
+            'label': tweet_label if showTweet else ans,
+            'response': sentence
+        }
+        response_obj['tasks'].append(res)
 
     prob = np.random.binomial(5, 0.5)
     if prob < 3:
         showTweet = False
-        # '/static/val2014_yesno/COCO_val2014_000000393282.jpg' # "Do you see a body of water in the picture?"
         # to random picture with question, image,answer
         question, img_path, ans = getImgQuesAns(random.choice(question_ids))
+        tweet = ''
     else:
         showTweet = True
-        # "The audio booth is ready to blow the roof off the Comcast Center tomorrow! Are you? #MDMadness"
-        tweet = random.choice(sentiment_data)['text']
+        tweet_data = random.choice(sentiment_data)
+        tweet = tweet_data['text']
+        tweet_label = tweet_data['label']
+        question = ''
+        img_path = ''
+        ans = ''
 
+    sentence = []
     num_tasks_shown += 1
-    if num_tasks_shown == total_num_tasks:
+
+    if num_tasks_shown == total_num_tasks + 1:
         print('Task End.')
         scheduler.remove_job('getItemsJob')
         taskFinish = True
+        camera.release()
+        print(response_obj)
+        with open('response_obj.json' if response_obj['prolific_pid'] is None
+                  else response_obj['prolific_pid']+'.json', 'w') as fp:
+            json.dump(response_obj, fp)
 
 
 def generate_frames():
     global camera
+    global sentence
 
     sequence = []
-    sentence = []
+
     predictions = []
     threshold = 0.90
     model = prepareModel()
@@ -132,8 +157,8 @@ def generate_frames():
                             else:
                                 sentence.append(actions[np.argmax(res)])
 
-                    if len(sentence) > 5:
-                        sentence = sentence[-5:]
+                    # if len(sentence) > 5:
+                        # sentence = sentence[-5:]
 
                 ret, buffer = cv2.imencode('.jpg', image)
                 frame = buffer.tobytes()
@@ -144,17 +169,16 @@ def generate_frames():
 
 @app.route('/_task-stuff', methods=['GET'])
 def stuff():
-    return jsonify(showTweet=showTweet, tweet=tweet, img_path=img_path, question=question, taskFinish=taskFinish)
+    return jsonify(showTweet=showTweet, tweet=tweet, img_path=img_path, question=question, taskFinish=taskFinish,
+                   sentence=sentence)
 
 
 @app.route('/home', methods=['GET', 'POST'])
 def home():
     global showButton
-    global prolific_id
-    global session_id
 
-    prolific_id = request.args.get("PROLIFIC_PID")
-    session_id = request.args.get("SESSION_ID")
+    response_obj['prolific_pid'] = request.args.get("PROLIFIC_PID")
+    response_obj['session_id'] = request.args.get("SESSION_ID")
 
     if request.method == 'POST':
         # getItemsToShow()
@@ -165,7 +189,7 @@ def home():
         showButton = False
 
     return render_template('index.html', img_path=img_path, tweet=tweet, question=question, showTweet=showTweet,
-                           showButton=showButton)
+                           showButton=showButton, sentence=sentence)
 
 
 @app.route('/')
@@ -178,9 +202,16 @@ def index():
     global ans
     global tweet
     global taskFinish
+    global tweet_label
+    global response_obj
+    global camera
 
     print('[DEBUG] call cv2.VideoCapture(0) from PID', os.getpid())
+
+    response_obj = {'date': str(datetime.now()), 'tasks': []}
     showButton = True
+    camera = cv2.VideoCapture(cv2.CAP_V4L2)
+
     if scheduler.state != 0:
         num_tasks_shown = 0
         showTweet = False
@@ -188,6 +219,7 @@ def index():
         img_path = ''
         ans = ''
         tweet = ''
+        tweet_label = ''
         taskFinish = False
         scheduler.pause()
         if scheduler.get_job(job_id='getItemsJob') is None:

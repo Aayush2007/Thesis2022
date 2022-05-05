@@ -27,12 +27,13 @@ h1{
 .pred_response {
     font-size: 30px;
     padding-top: 10px;
+    display: inline-flex;
 }
 #click{
     display: inline;
     cursor: pointer;
 }
-.btn-success, .btn-danger{
+.btn-primary, .btn-danger, .btn-success{
     font-weight: 700;
     font-size: xx-large;
 }
