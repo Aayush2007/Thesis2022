@@ -17,7 +17,7 @@ h1{
 .video-capture img{
     border: 5px red solid;
 }
-p.container{
+.text-area{
     text-align: justify;
     font-size: 18px;
 }
@@ -27,4 +27,12 @@ p.container{
 .pred_response {
     font-size: 30px;
     padding-top: 10px;
+}
+#click{
+    display: inline;
+    cursor: pointer;
+}
+.btn-success, .btn-danger{
+    font-weight: 700;
+    font-size: xx-large;
 }

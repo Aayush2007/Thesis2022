@@ -4,8 +4,6 @@ import os
 import mediapipe as mp
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
-from statistics import mode
 
 
 mp_holistic = mp.solutions.holistic  # Holistic model
@@ -55,13 +53,14 @@ def extract_keypoints(results):
         if results.right_hand_landmarks else np.zeros(21 * 3)
     return np.concatenate([pose, face, lh, rh]), lh, rh
 
+
 # For sentiment analysis (HuggingFace Dataset) 0: negative 1: neutral 2: positive
 actions = np.array(['Yes', 'No', 'Maybe', 'Positive', 'Negative', 'Neutral'])
 
 
 def prepareModel():
     model = Sequential()
-    model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(None,1662)))
+    model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(None, 1662)))
     model.add(LSTM(128, return_sequences=False, activation='relu'))
     model.add(Dense(64, activation='relu'))
     model.add(Dense(32, activation='relu'))

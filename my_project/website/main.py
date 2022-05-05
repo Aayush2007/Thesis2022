@@ -1,13 +1,17 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for
 import cv2
 import os
 import json
 import numpy as np
 from model import actions, mp_holistic, mediapipe_detection, draw_styled_landmarks, extract_keypoints, prepareModel
-
+from statistics import mode
+import random
+import time
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
-camera = cv2.VideoCapture(-1)
+scheduler = BackgroundScheduler()
+camera = cv2.VideoCapture(cv2.CAP_V4L2)
 question_ids = []
 
 f = open('v2_mscoco_val2014_annotations_yesno.json', )
@@ -20,6 +24,19 @@ f.close()
 
 with open("sentiment_data", "r") as fp:
     sentiment_data = json.load(fp)
+
+question = ''
+img_path = ''
+ans = ''
+tweet = ''
+showTweet = False
+num_tasks_shown = 0
+showButton = True
+taskFinish = False
+prolific_id = ''
+session_id = ''
+sub_task_time = 10
+total_num_tasks = 5
 
 no_sequences = 60  # stores number of videos for each action.
 sequence_length = 50  # stores number of frames per video
@@ -36,17 +53,43 @@ def getAnswer(ques_id):
 
 
 def getImgQuesAns(ques_id):
-    BASE_PATH = os.path.join('val2014_yesno')
+    BASE_PATH = os.path.join('static', 'val2014_yesno')
     for q in val_questions:
         if q['question_id'] == ques_id:
             ques = q['question']
-            ans = getAnswer(q['question_id'])
-            return ques, os.path.join(BASE_PATH, 'COCO_val2014_' + str(q['image_id']).zfill(12) + '.jpg'), ans
+            answer = getAnswer(q['question_id'])
+            return ques, os.path.join(BASE_PATH, 'COCO_val2014_' + str(q['image_id']).zfill(12) + '.jpg'), answer
 
     return 'Not found', '', '-1'
 
 
+def getItemsToShow():
+    global showTweet
+    global question
+    global img_path
+    global ans
+    global tweet
+    global num_tasks_shown
+    global taskFinish
 
+    print(num_tasks_shown)
+
+    prob = np.random.binomial(5, 0.5)
+    if prob < 3:
+        showTweet = False
+        # '/static/val2014_yesno/COCO_val2014_000000393282.jpg' # "Do you see a body of water in the picture?"
+        # to random picture with question, image,answer
+        question, img_path, ans = getImgQuesAns(random.choice(question_ids))
+    else:
+        showTweet = True
+        # "The audio booth is ready to blow the roof off the Comcast Center tomorrow! Are you? #MDMadness"
+        tweet = random.choice(sentiment_data)['text']
+
+    num_tasks_shown += 1
+    if num_tasks_shown == total_num_tasks:
+        print('Task End.')
+        scheduler.remove_job('getItemsJob')
+        taskFinish = True
 
 
 def generate_frames():
@@ -58,7 +101,7 @@ def generate_frames():
     threshold = 0.90
     model = prepareModel()
 
-    with mp_holistic.Holistic(min_detection_confidence=0.7, min_tracking_confidence=0.7) as holistic:
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
         while True:
             success, frame = camera.read()
 
@@ -79,7 +122,7 @@ def generate_frames():
                     print("Accuracy:", res[np.argmax(res)])
                     predictions.append(np.argmax(res))
 
-                    if np.unique(predictions[-5:])[0] == np.argmax(res):
+                    if mode(predictions[-3:]) == np.argmax(res):
                         if res[np.argmax(res)] > threshold:
                             print("Accuracy:", res[np.argmax(res)])
                             sequence = []
@@ -99,15 +142,58 @@ def generate_frames():
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
+@app.route('/_task-stuff', methods=['GET'])
+def stuff():
+    return jsonify(showTweet=showTweet, tweet=tweet, img_path=img_path, question=question, taskFinish=taskFinish)
+
+
+@app.route('/home', methods=['GET', 'POST'])
+def home():
+    global showButton
+    global prolific_id
+    global session_id
+
+    prolific_id = request.args.get("PROLIFIC_PID")
+    session_id = request.args.get("SESSION_ID")
+
+    if request.method == 'POST':
+        # getItemsToShow()
+        if scheduler.state == 2:
+            scheduler.resume()
+        else:
+            scheduler.start()
+        showButton = False
+
+    return render_template('index.html', img_path=img_path, tweet=tweet, question=question, showTweet=showTweet,
+                           showButton=showButton)
+
+
 @app.route('/')
 def index():
-    print('[DEBUG] call cv2.VideoCapture(0) from PID', os.getpid())
-    img_path = '/static/COCO_val2014_000000393282.jpg'
-    question = "Do you see a body of water in the picture?"
-    tweet = "The audio booth is ready to blow the roof off the Comcast Center tomorrow! Are you? #MDMadness"
-    showTweet = False
+    global showButton
+    global num_tasks_shown
+    global showTweet
+    global question
+    global img_path
+    global ans
+    global tweet
+    global taskFinish
 
-    return render_template('index.html', img_path=img_path, tweet=tweet, question=question, showTweet=showTweet)
+    print('[DEBUG] call cv2.VideoCapture(0) from PID', os.getpid())
+    showButton = True
+    if scheduler.state != 0:
+        num_tasks_shown = 0
+        showTweet = False
+        question = ''
+        img_path = ''
+        ans = ''
+        tweet = ''
+        taskFinish = False
+        scheduler.pause()
+        if scheduler.get_job(job_id='getItemsJob') is None:
+            scheduler.add_job(func=getItemsToShow, trigger="interval", seconds=sub_task_time, id='getItemsJob')
+
+    return redirect(url_for('home'))
 
 
 @app.route('/video')
@@ -120,6 +206,10 @@ if __name__ == '__main__':
     for val in val_questions:
         question_ids.append(val['question_id'])
 
-    # getImgQuesAns(random.choice(question_ids)) ## to random picture with question, image,answer
+    scheduler.add_job(func=getItemsToShow, trigger="interval", seconds=sub_task_time, id='getItemsJob')
 
-    app.run(debug=False, host='localhost', port=8080)
+    app.run(debug=False, host='0.0.0.0', port=8080)
+
+    # from waitress import serve
+
+    # serve(app, host="0.0.0.0", port=8080)
