@@ -6,3 +6,5 @@ sklearn
 matplotlib
 tqdm
 flask
+apscheduler
+waitress
