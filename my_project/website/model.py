@@ -60,7 +60,7 @@ actions = np.array(['Yes', 'No', 'Maybe', 'Positive', 'Negative', 'Neutral'])
 
 def prepareModel():
     model = Sequential()
-    model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(None, 1662)))
+    model.add(LSTM(64, return_sequences=True, activation='relu', input_shape=(None, 126)))  # 1662
     model.add(LSTM(128, return_sequences=False, activation='relu'))
     model.add(Dense(64, activation='relu'))
     model.add(Dense(32, activation='relu'))
@@ -68,6 +68,6 @@ def prepareModel():
 
     model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 
-    model.load_weights('../slr_6action_2lstm_Adam_acc.100_v5.h5')
+    model.load_weights('slr_6action_2lstm_Adam_acc.88_v1_hands.h5')
 
     return model

@@ -133,7 +133,7 @@ def generate_frames():
     threshold = 0.90
     model = prepareModel()
 
-    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+    with mp_holistic.Holistic(min_detection_confidence=0.7, min_tracking_confidence=0.7) as holistic:
         while True:
             success, frame = camera.read()
 
@@ -145,7 +145,7 @@ def generate_frames():
                 draw_styled_landmarks(image, results)
 
                 keypoints, lh, rh = extract_keypoints(results)
-                sequence.append(keypoints)
+                sequence.append(keypoints[-126:])
                 sequence = sequence[-50:]
 
                 if len(sequence) == 50 and (sum(lh) != 0 or sum(rh) != 0):
