@@ -10,8 +10,8 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
-scheduler = BackgroundScheduler()
-camera = None # cv2.VideoCapture(cv2.CAP_V4L2)
+
+camera = None  # cv2.VideoCapture(cv2.CAP_V4L2)
 question_ids = []
 
 f = open('v2_mscoco_val2014_annotations_yesno.json', )
@@ -21,6 +21,9 @@ f.close()
 f = open('v2_OpenEnded_mscoco_val2014_questions_yesno.json', )
 val_questions = json.load(f)
 f.close()
+
+for val in val_questions:
+    question_ids.append(val['question_id'])
 
 with open("sentiment_data", "r") as fp:
     sentiment_data = json.load(fp)
@@ -75,7 +78,7 @@ def getItemsToShow():
     global tweet_label
     global sentence
 
-    print(num_tasks_shown)
+    print("Number of tasks shown:", num_tasks_shown)
 
     if num_tasks_shown != 0:
         res = {
@@ -112,8 +115,12 @@ def getItemsToShow():
         camera.release()
         print(response_obj)
         with open('response_obj.json' if response_obj['prolific_pid'] is None
-                  else response_obj['prolific_pid']+'.json', 'w') as fp:
+                  else response_obj['prolific_pid'] + '.json', 'w') as fp:
             json.dump(response_obj, fp)
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=getItemsToShow, trigger="interval", seconds=sub_task_time, id='getItemsJob')
 
 
 def generate_frames():
@@ -158,7 +165,7 @@ def generate_frames():
                                 sentence.append(actions[np.argmax(res)])
 
                     # if len(sentence) > 5:
-                        # sentence = sentence[-5:]
+                    # sentence = sentence[-5:]
 
                 ret, buffer = cv2.imencode('.jpg', image)
                 frame = buffer.tobytes()
@@ -182,6 +189,7 @@ def home():
 
     if request.method == 'POST':
         # getItemsToShow()
+        print("###$$$$$$$$$$$$$$$$$$$$ Scheduler state:", scheduler.state)
         if scheduler.state == 2:
             scheduler.resume()
         else:
@@ -210,6 +218,8 @@ def index():
 
     response_obj = {'date': str(datetime.now()), 'tasks': []}
     showButton = True
+    if camera is not None:
+        camera.release()
     camera = cv2.VideoCapture(cv2.CAP_V4L2)
 
     if scheduler.state != 0:
@@ -234,13 +244,7 @@ def video():
 
 
 if __name__ == '__main__':
-
-    for val in val_questions:
-        question_ids.append(val['question_id'])
-
-    scheduler.add_job(func=getItemsToShow, trigger="interval", seconds=sub_task_time, id='getItemsJob')
-
-    app.run(debug=False, host='0.0.0.0', port=8080)
+    app.run(debug=False, host="0.0.0.0")
 
     # from waitress import serve
 

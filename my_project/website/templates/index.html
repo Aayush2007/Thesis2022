@@ -19,6 +19,7 @@
             $.getJSON($SCRIPT_ROOT + '/_task-stuff',
 
           function(data) {
+              console.log(data)
               if (!data.taskFinish){
                 if (data.showTweet){
                     $('#tweet').text(data.tweet);
