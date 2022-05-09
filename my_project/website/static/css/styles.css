@@ -37,3 +37,11 @@ h1{
     font-weight: 700;
     font-size: xx-large;
 }
+.time-area{
+    font-weight: 700;
+    font-size: 20px;
+}
+#timeKeep{
+    display: contents;
+    color:red;
+}

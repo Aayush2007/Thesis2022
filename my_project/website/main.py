@@ -37,10 +37,11 @@ showTweet = False
 num_tasks_shown = 0
 showButton = True
 taskFinish = False
-sub_task_time = 10
+sub_task_time = 15
 total_num_tasks = 15
 sentence = []
 response_obj = {}
+timeKeep = 0
 
 no_sequences = 60  # stores number of videos for each action.
 sequence_length = 50  # stores number of frames per video
@@ -77,8 +78,11 @@ def getItemsToShow():
     global taskFinish
     global tweet_label
     global sentence
+    global timeKeep
 
     print("Number of tasks shown:", num_tasks_shown)
+    sentence = []
+    timeKeep = 1
 
     if num_tasks_shown != 0:
         res = {
@@ -105,22 +109,32 @@ def getItemsToShow():
         img_path = ''
         ans = ''
 
-    sentence = []
     num_tasks_shown += 1
 
     if num_tasks_shown == total_num_tasks + 1:
         print('Task End.')
         scheduler.remove_job('getItemsJob')
+        scheduler.remove_job('keepTimer')
         taskFinish = True
         camera.release()
+        response_obj['end_date'] = str(datetime.now())
         print(response_obj)
         with open('response_obj.json' if response_obj['prolific_pid'] is None
                   else response_obj['prolific_pid'] + '.json', 'w') as fp:
             json.dump(response_obj, fp)
 
 
+def keepTimer():
+    global timeKeep
+    if timeKeep == sub_task_time:
+        pass
+    else:
+        timeKeep += 1
+
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=getItemsToShow, trigger="interval", seconds=sub_task_time, id='getItemsJob')
+scheduler.add_job(func=keepTimer, trigger="interval", seconds=1, id='keepTimer')
 
 
 def generate_frames():
@@ -154,13 +168,13 @@ def generate_frames():
                     print("Accuracy:", res[np.argmax(res)])
                     predictions.append(np.argmax(res))
 
-                    if mode(predictions[-3:]) == np.argmax(res):
+                    if mode(predictions[-5:]) == np.argmax(res):
                         if res[np.argmax(res)] > threshold:
                             print("Accuracy:", res[np.argmax(res)])
                             sequence = []
                             if len(sentence) > 0:
-                                if actions[np.argmax(res)] != sentence[-1]:
-                                    sentence.append(actions[np.argmax(res)])
+                                # if actions[np.argmax(res)] != sentence[-1]:
+                                sentence.append(actions[np.argmax(res)])
                             else:
                                 sentence.append(actions[np.argmax(res)])
 
@@ -177,7 +191,7 @@ def generate_frames():
 @app.route('/_task-stuff', methods=['GET'])
 def stuff():
     return jsonify(showTweet=showTweet, tweet=tweet, img_path=img_path, question=question, taskFinish=taskFinish,
-                   sentence=sentence)
+                   sentence=sentence, timeKeep=timeKeep)
 
 
 @app.route('/home', methods=['GET', 'POST'])
@@ -189,7 +203,7 @@ def home():
 
     if request.method == 'POST':
         # getItemsToShow()
-        print("###$$$$$$$$$$$$$$$$$$$$ Scheduler state:", scheduler.state)
+        # print("###$$$$$$$$$$$$$$$$$$$$ Scheduler state:", scheduler.state)
         if scheduler.state == 2:
             scheduler.resume()
         else:
@@ -213,10 +227,11 @@ def index():
     global tweet_label
     global response_obj
     global camera
+    global timeKeep
 
     print('[DEBUG] call cv2.VideoCapture(0) from PID', os.getpid())
 
-    response_obj = {'date': str(datetime.now()), 'tasks': []}
+    response_obj = {'start_date': str(datetime.now()), 'tasks': []}
     showButton = True
     if camera is not None:
         camera.release()
@@ -231,9 +246,11 @@ def index():
         tweet = ''
         tweet_label = ''
         taskFinish = False
+        timeKeep = 0
         scheduler.pause()
         if scheduler.get_job(job_id='getItemsJob') is None:
             scheduler.add_job(func=getItemsToShow, trigger="interval", seconds=sub_task_time, id='getItemsJob')
+            scheduler.add_job(func=keepTimer, trigger="interval", seconds=1, id='keepTimer')
 
     return redirect(url_for('home'))
 
