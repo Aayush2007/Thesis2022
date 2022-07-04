@@ -1,0 +1,80 @@
+body{
+    color: white;
+    text-align: center;
+}
+h1{
+    padding: 2%;
+}
+.question, .tweet {
+    font-size: 35px;
+    padding: 20px 0;
+}
+.tweet {
+    background-color: blue;
+    padding: 5%;
+    margin: 7%;
+}
+.video-capture img{
+    border: 5px red solid;
+}
+.text-area{
+    text-align: justify;
+    font-size: 18px;
+}
+.task-area{
+    margin: 2% 0;
+}
+.pred_response {
+    font-size: 30px;
+    padding-top: 10px;
+    display: inline-flex;
+}
+#click{
+    display: inline;
+    cursor: pointer;
+}
+.btn-primary, .btn-danger, .btn-success{
+    font-weight: 700;
+    font-size: xx-large;
+}
+.time-area{
+    font-weight: 700;
+    font-size: 20px;
+}
+#timeKeep{
+    display: contents;
+    color:red;
+}
+.thanks-area{
+    margin-top: 4%;
+}
+.terms-conditions{
+    display: flex;
+    margin-top: 20px;
+}
+#tnc{
+    margin-top: 5px;
+    margin-right: 10px;
+}
+label{
+    text-align: justify;
+}
+#text_response{
+    height: 50px;
+    padding-left: 30px;
+    font-size: 25px;
+    width: 10%;
+    margin-right: 20px;
+}
+#nextButton{
+    height: 48px;
+    vertical-align: bottom;
+    padding: 0 20px;
+}
+label.btn {
+    padding: 11px;
+    font-weight: 700;
+}
+#optionArea1 label.btn {
+    padding: 11px 20px;
+}

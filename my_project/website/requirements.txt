@@ -1,0 +1,10 @@
+Flask
+tensorflow==2.4.1
+mediapipe
+opencv-python
+apscheduler
+gunicorn
+google-cloud-storage
+google-cloud-logging
+grpcio==1.32.0
+protobuf==3.19.3

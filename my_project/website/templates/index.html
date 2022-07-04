@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="#">
+    <title>SignUpCrowd</title>
+    <link rel="shortcut icon" href="/static/ok.png" type="image/png">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js" crossorigin="anonymous"></script>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+
+    <script src="/static/js/task_script.js"></script>
+
+    <script type="text/javascript">
+        var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+        //var intervalID = setInterval(update_values, 1000);
+        var tryInterval;
+        var taskStarted = false;
+        const uploadWidth = 640;
+        var apiServer = {{ request.script_root|tojson|safe }} + '/image';
+        var taskServer = {{ request.script_root|tojson|safe }} + '/getTaskResponse';
+        var tryModeServer = {{ request.script_root|tojson|safe }} + '/try_mode';
+        var setItemServer = {{ request.script_root|tojson|safe }} + '/set_items';
+        var taskTyping = true;
+        var showTweet = true;
+
+        var totalTasks = 16+1;
+        var tryTasks = 5+1;
+        var time1 = 0;
+        var timerInterval;
+
+        var questionToAsk;
+        var questionImage;
+        var tweetToShow;
+        var taskLabel;
+
+        var taskResponse = {};
+
+        survey_link = 'https://docs.google.com/forms/d/e/1FAIpQLSeNoKy0JEkgAipSI3SS8R4TnzOLX0o6kRaDr0uop8EZlMS2MA/viewform?usp=pp_url&entry.1722510161='
+
+        function update_values() {
+          $.getJSON($SCRIPT_ROOT + '/_task-stuff',
+
+          function(data) {
+              console.log(data)
+              showTweet = data.showTweet;
+              taskTyping = data.taskTyping;
+
+              if(data.tryMode){
+                  if (parseInt(getCookie('try_task_count')) == parseInt(getCookie('task_limit'))){
+                    console.log("----------try task Done-----------");
+                    clearInterval(tryInterval);
+                    setCookie('try_task_count', (parseInt(getCookie('try_task_count')) + 1).toString());
+                  }
+                  if (parseInt(getCookie('try_task_count')) == parseInt(getCookie('task_limit')) + 1 && getCookie('task_finish') == 'false'){
+                    setCookie('task_finish', 'true', 1);
+                    update_values();
+                    //setCookie('show_button', 'true', 1);
+                  }
+              }
+              if(getCookie('start_mode') == "true"){
+
+                  if (parseInt(getCookie('task_count')) == parseInt(getCookie('task_limit'))){
+                    console.log("----------Task Done-----------");
+                    clearInterval(tryInterval);
+                    setCookie('task_count', (parseInt(getCookie('task_count')) + 1).toString());
+                  }
+                  if (parseInt(getCookie('task_count')) == parseInt(getCookie('task_limit')) + 1 && getCookie('task_finish') == 'false'){
+                    setCookie('task_finish', 'true', 1);
+                    update_values();
+                    //setCookie('show_button', 'true', 1);
+                  }
+              }
+
+              if (!data.taskFinish){
+                //$('#timeKeep').text(data.timeKeep);
+                if (!data.showButton){
+                    $("#showVid").click();
+                }
+
+                if (data.showTweet){
+                    $('#tweet').text(tweetToShow);
+                    $('#tweet-area').show();
+                    $('#vqa-area').hide();
+                }
+                else{
+                    $('#img_path').attr('src',questionImage);
+                    if(data.showTask1){
+                        $('#question').text(questionToAsk);
+                    }
+                    else{
+                        $('#question').text(questionToAsk + " yes, no or maybe?");
+                    }
+                    $('#tweet-area').hide();
+                    $('#vqa-area').show();
+                }
+              }
+              else{
+                if(!data.tryMode && data.showTask1){
+                    $('#stop-area').show();
+                    $('#task-area').hide();
+                    $("#stop").click();
+                }
+                else if(!data.showTask1){
+                    $('#stop-area').show();
+                    $('#task-area').hide();
+                    $("#stop").click();
+                }
+                else{ // things to do when task is finished in tryMode
+                    //console.log('###################################3');
+                    setCookie('try_mode', false, 1);
+                    $('#trySend').click();
+                    $('#task-area').hide();
+                    $('#info-section').show();
+                }
+              }
+          });
+        };
+
+        const constraints = window.constraints = {
+          audio: false,
+          video: {
+                    width: { min: 640, ideal: 640, max: 640 },
+                    height: { min: 480, ideal: 480, max: 480 },
+                }
+        };
+
+        function handleSuccess(stream) {
+          const video = document.querySelector('video#sourceVideo');
+          const videoTracks = stream.getVideoTracks();
+
+          console.log('Got stream with constraints:', constraints);
+          console.log(`Using video device: ${videoTracks[0].label}`);
+
+          // window.stream = stream; // make variable available to browser console
+          video.srcObject = stream;
+        }
+
+        function handleError(error) {
+          if (error.name === 'OverconstrainedError') {
+            const v = constraints.video;
+            errorMsg(`The resolution ${v.width.exact}x${v.height.exact} px is not supported by your device.`);
+          } else if (error.name === 'NotAllowedError') {
+            errorMsg('Permissions have not been granted to use your camera and ' +
+              'microphone, you need to allow the page access to your devices in ' +
+              'order for the demo to work.');
+          }
+          errorMsg(`getUserMedia error: ${error.name}`, error);
+        }
+
+        function errorMsg(msg, error) {
+          const errorElement = document.querySelector('#errorMsg');
+          errorElement.innerHTML += `<p>${msg}</p>`;
+          if (typeof error !== 'undefined') {
+            console.error(error);
+          }
+        }
+
+        async function init(e) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            handleSuccess(stream);
+            e.target.disabled = true;
+          } catch (e) {
+            handleError(e);
+          }
+        }
+
+    </script>
+    <script type="module">
+        const videoElement = document.getElementsByClassName('input_video')[0];
+        const canvasElement = document.getElementsByClassName('output_canvas')[0];
+        const canvasCtx = canvasElement.getContext('2d');
+
+        function onResults(results) {
+        var newObject = {
+            'pose_landmarks': results.poseLandmarks == undefined ? [] : results.poseLandmarks,
+            'face_landmarks': results.faceLandmarks == undefined ? [] : results.faceLandmarks,
+            'left_hand_landmarks': results.leftHandLandmarks == undefined ? []: results.leftHandLandmarks,
+            'right_hand_landmarks': results.rightHandLandmarks == undefined ? []: results.rightHandLandmarks,
+          }
+          canvasCtx.save();
+          canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+          // canvasCtx.drawImage(results.segmentationMask, 0, 0, canvasElement.width, canvasElement.height);
+
+          // Only overwrite existing pixels.
+          canvasCtx.globalCompositeOperation = 'source-in';
+          canvasCtx.fillStyle = '#00FF00';
+          canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+
+          // Only overwrite missing pixels.
+          canvasCtx.globalCompositeOperation = 'destination-atop';
+          canvasCtx.drawImage(
+              results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+          canvasCtx.globalCompositeOperation = 'source-over';
+
+          drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS,
+                         {color: '#CC0000', lineWidth: 5});
+          drawLandmarks(canvasCtx, results.leftHandLandmarks,
+                        {color: '#00FF00', lineWidth: 2});
+          drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS,
+                         {color: '#00CC00', lineWidth: 5});
+          drawLandmarks(canvasCtx, results.rightHandLandmarks,
+                        {color: '#FF0000', lineWidth: 2});
+          canvasCtx.restore();
+
+          var c_keypoints = extract_keypoints(newObject);
+
+          var stored_keypoints = JSON.parse(sessionStorage.getItem('s_keypoints'));
+          stored_keypoints.push(c_keypoints[0]);
+
+          postFile(stored_keypoints.slice(-50), c_keypoints[1], c_keypoints[2]);
+
+          sessionStorage.setItem('s_keypoints', JSON.stringify(stored_keypoints));
+        }
+
+        function extract_keypoints(newObject){
+            var lh=[];
+            var rh=[];
+
+            if (newObject['left_hand_landmarks'].length == 0){
+                lh = new Array(63).fill(0);
+            }
+            else{
+                for (var i=0;i<newObject['left_hand_landmarks'].length;i++){
+                    lh.push(newObject['left_hand_landmarks'][i].x);
+                    lh.push(newObject['left_hand_landmarks'][i].y);
+                    lh.push(newObject['left_hand_landmarks'][i].z);
+                }
+            }
+
+            if (newObject['right_hand_landmarks'].length == 0){
+                rh = new Array(63).fill(0);
+            }
+            else{
+                for (var i=0;i<newObject['right_hand_landmarks'].length;i++){
+                    rh.push(newObject['right_hand_landmarks'][i].x);
+                    rh.push(newObject['right_hand_landmarks'][i].y);
+                    rh.push(newObject['right_hand_landmarks'][i].z);
+                }
+            }
+
+            return [lh.concat(rh), lh ,rh];
+        }
+
+        const holistic = new Holistic({locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+        }});
+        holistic.setOptions({
+          modelComplexity: 1,
+          staticImageMode: false,
+          smoothLandmarks: true,
+          enableSegmentation: false,
+          refineFaceLandmarks: false,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.7
+        });
+        holistic.onResults(onResults);
+
+        var camera = new Camera(videoElement, {
+          onFrame: async () => {
+            await holistic.send({image: videoElement});
+          },
+          width: 640,
+          height: 480
+        });
+        camera.start();
+    </script>
+    <button type="button" id="showVid" style="opacity:0;"></button>
+</head>
+
+<body class="bg-dark" onload="update_values();" data-url="{{ url_for('home') }}">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+                crossorigin="anonymous"></script>
+    <div class="container-fluid">
+        <h1>Complete the following Classification Task {% if showTask1 %} Using American Sign Language (ASL) {% endif %}</h1>
+
+        <div class="container text-area">
+            This task batch consists of two types of tasks - <strong>Visual Question Answering</strong>,
+            and <strong>Tweet Sentiment Classification</strong>.
+            In total, there will be {{total_num_tasks}} tasks in the batch,
+            which will contain tasks of both types.
+            {% if showTask1 %}
+            For each task, you will be given {{sub_task_time}} seconds to provide your answer using Sign Language.
+            During these 15 seconds, you can respond multiple times for the same task in case your response is
+            not detected immediately or if you want to change your response.
+            As the Sign Language is converted into text format, it is possible that the system misinterprets the signs sometimes.
+            So, it is recommended to at-least provide the input 3 times when necessary.
+            In total, completing the entire batch of tasks will take around 5 minutes.
+            Since the input method for these tasks is Sign Language,
+            it is important that your camera nicely covers you in the frame. So, if you are asked by the browser to
+            allow camera permissions, please click "Allow".
+            <br>
+            The ideal posture will be when the camera is able to capture the entire face of the participant with
+            the elbows also coming into the frame when you begin sign language sequences. So, make sure you are at
+            a distance of around 1-1.5 meters from the camera. There is a "TRY IT OUT" button which can help you to
+            familiarize yourself with the application. The trial mode just contains {{ try_tasks }} tasks.
+            You can try it as many times as you like and start when you are sure.
+            Just after you press the "START" button, there will be a delay for a few
+            seconds so that you can adjust yourself in the camera.
+            {% endif %}
+
+            {% if showTask1 %}
+            For more details about the tasks,
+            <a id="click" class="btn-link" data-bs-toggle="collapse" href="#click-here-region"
+               role="button" aria-expanded="false" aria-controls="click-here-region">click here.</a>
+            <br/>
+            <div class="collapse" id="click-here-region">
+                <div class="card-body">
+                    <strong style="text-decoration:underline;">Visual Question Answering</strong> -
+                    In this task, a picture will be shown to you.
+                    Along with the picture, there will be a question regarding the picture
+                    (e.g., 'Do you see a body of water in the picture?').
+                    The answer to the question will be a "YES", "NO" or "MAYBE".
+                    {% if showTask1 %} The answer from you will be captured via Sign Language. {% endif %}
+                    <br/>
+                    <strong style="text-decoration:underline;">Tweet Sentiment Classification</strong> -
+                    In this task, a text/tweet will be shown to you.
+                    You will be required to assess the sentiment of the text/tweet
+                    (for e.g., "This time tomorrow...we'll have the Iron on.
+                    Iron Maiden pieces Drops tomorrow nights.") by choosing one of "POSITIVE",
+                    "NEGATIVE" or "NEUTRAL" options.
+                    {% if showTask1 %} Your answer will be captured using Sign Language. {% endif %}
+                </div>
+                {% if showTask1 %}
+                    If you are not very familiar with the American Sign Language, you can visit this
+                    <a href="https://www.handspeak.com/word/search/" target="_blank" rel="noopener">website</a>
+                    to learn various words. Links for the words that are necessary to complete this task are given below.
+                    Please remember that Sign Languages are not just about hand gestures,
+                    it also covers body pose and facial expressions.
+                    <ul>
+                        <li>Yes: <a href="https://www.handspeak.com/word/search/index.php?id=2443" target="_blank" rel="noopener">
+                            https://www.handspeak.com/word/search/index.php?id=2443</a></li>
+                        <li>No: <a href="https://www.handspeak.com/word/search/index.php?id=1496" target="_blank" rel="noopener">
+                            https://www.handspeak.com/word/search/index.php?id=1496</a></li>
+                        <li>Maybe: <a href="https://www.handspeak.com/word/search/index.php?id=1362" target="_blank" rel="noopener">
+                            https://www.handspeak.com/word/search/index.php?id=1362</a></li>
+                        <li>Positive: <a href="https://www.handspeak.com/word/search/index.php?id=1682" target="_blank" rel="noopener">
+                            https://www.handspeak.com/word/search/index.php?id=1682</a></li>
+                        <li>Negative:
+                            <a href="https://www.handspeak.com/word/search/index.php?id=1473" target="_blank" rel="noopener">
+                                https://www.handspeak.com/word/search/index.php?id=1473</a></li>
+                        <li>Neutral: <a href="https://www.handspeak.com/word/n/neutral.mp4" target="_blank" rel="noopener">
+                            https://www.handspeak.com/word/n/neutral.mp4</a></li>
+                    </ul>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <form method="get" action="/home">
+            <div>
+                <button class="btn btn-primary" type="submit" id="trySend" style="opacity: 0;"></button>
+            </div>
+        </form>
+        {% if showButton %}
+        <!--     Start id info-section       -->
+        <div id="info-section">
+            <div class="container terms-conditions" id="terms-conditions">
+                <input type="checkbox" id="tnc" name="tnc" value="TC" onchange="document.getElementById('start').disabled = !this.checked;">
+                <label for="tnc"> By ticking, I confirm that I have read the instructions to complete the task and
+                    will honestly take part in this study.
+                    {% if showTask1 %}
+                        Also, we assure that image/video from the camera
+                        will NOT be stored in any form.
+                    {% endif %}
+                    Any type of data shared during the task, will solely be
+                    kept for the task and will NOT be shared.
+                </label>
+            </div>
+            <div style="display: inline-flex;" id="button-area">
+            {% if showTask1 %}
+                <div id="try-area" style="margin-top: 5%;margin-bottom: 5%;">
+<!--                    <form method="get" action="/home">-->
+                        <div>
+                            <button class="btn btn-primary" type="button" id="try" style="padding-left: 30px;padding-right: 30px;">TRY IT OUT</button>
+<!--                            <button class="btn btn-primary" type="submit" id="trySend" style="opacity: 0;"></button>-->
+                        </div>
+<!--                    </form>-->
+                </div>
+                <div id="start-area" style="margin-top: 5%;margin-bottom: 5%;">
+                    <form method="post" action="/home">
+                        <div class="container col-md-4">
+                            <button class="btn btn-primary" type="submit" id="start" disabled style="padding-left: 50px;padding-right: 50px;">START</button>
+                        </div>
+                    </form>
+                </div>
+            {% endif %}
+            </div>
+        </div>
+        <!--     End id info-section       -->
+
+        {% else %}
+        <div id="stop-area" style="margin-top: 2%; display: none;">
+            <div class="container col-md-4 d-grid">
+                <button class="btn btn-danger" type="button" id="stop">STOP</button>
+            </div>
+        </div>
+        <div id="done-area" style="margin-top: 2%; display: none;">
+            <div class="container col-md-4 d-grid">
+                <button class="btn btn-success" id="done" disabled>DONE</button>
+            </div>
+            <div class="container thanks-area">
+                <p>Thank you very much for your participation.
+                    Now, please complete a small survey to give us a better idea of your task experience.
+                    Click here to go to the <a href={{survey_link}} rel="noopener" id="surveyLink">survey</a>.
+                    If for any reason the above link does not work, you can also use this link:
+                    <a href="https://forms.gle/8YHeg4BwRvXPUTTN7" rel="noopener">https://forms.gle/8YHeg4BwRvXPUTTN7</a>
+                    After the completion of the survey, we will provide you the completion link/code.</p>
+            </div>
+        </div>
+
+        <!--     Start id task-area       -->
+        <div id="task-area" class="task-area container-fluid" >
+            {% if showTask1 %}
+                {% if tryMode %}
+                    <div>** This is a trial mode. If you want start the actual task, please click "START" button when trial mode ends.</div>
+                {% endif %}
+            <div class="row time-area">
+                <div>Timer: <p id="timeKeep"></p></div>
+            </div>
+            {% endif %}
+            <div class="row">
+                <div class="col">
+                    <div id="tweet-area">
+                        <div class="tweet bottom-left" id="tweet">{{ tweet }}</div>
+                        <div class="question bottom-left">Do you think this statement is Positive,
+                            Negative or Neutral?</div>
+                    </div>
+                    <div id="vqa-area">
+                        <img id="img_path" src="{{ img_path }}" width="55%" height="60%" alt="Image to Answer."/>
+                        <div class="question bottom-left" id="question"></div>
+                    </div>
+
+                </div>
+                {% if showTask1 %}
+                    <div class="col">
+                        <div class="video-capture">
+                            <div class="container">
+                                <video class="input_video" style="display:none;"></video>
+                                <canvas class="output_canvas" width="640px" height="480px"></canvas>
+                            </div>
+                        </div>
+                        <div class="pred_response">
+                            Response: <div id="pResponse"></div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <!--     End id task-area       -->
+        {% endif %}
+    </div>
+</body>
+</html>
